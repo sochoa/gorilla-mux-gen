@@ -1,0 +1,90 @@
+import (
+    "encoding/json"
+    "log"
+    "net/http"
+    "strconv"
+    "time"
+    "github.com/gorilla/mux"
+)
+
+
+{% set lowerCamelCase       = resource.name                | lower_camel_case -%}
+{% set lowerCamelCaseIdSlug = "{" + lowerCamelCase + "Id}"                    -%}
+{% set lowerCamelCasePlural = lowerCamelCase               | plural           -%}
+{% set lowerCamelCaseId     = lowerCamelCase + "Id"                           -%}
+{% set upperCamelCase       = resource.name                | upper_camel_case -%}
+{% set upperCamelCase       = upperCamelCase                                  -%}
+{% set upperCamelCaseId     = upperCamelCase + "Id"                           -%}
+{% set upperCamelCasePlural = upperCamelCase               | plural           -%}
+
+type {{ upperCamelCase }} struct {
+  {{ upperCamelCaseId }} int64
+  {% for m in resource.members -%}
+  {{ m.name | upper_camel_case }} {{ m.type }} `json:{{ m.name | lower_camel_case }}`
+  {% endfor %}
+}
+
+var {{upperCamelCasePlural}} []{{lowerCamelCase}}
+
+func create{{upperCamelCase}}(responseWriter http.ResponseWriter, request *http.Request) {
+    var {{lowerCamelCase}} {{upperCamelCase}}
+    json.NewDecoder(request.Body).Decode(&{{lowerCamelCase}})
+    {{lowerCamelCase}}.{{upperCamelCaseId}} = len({{upperCamelCasePlural}})
+    {{upperCamelCasePlural}} = append({{upperCamelCasePlural}}, {{lowerCamelCase}})
+    responseWriter.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(responseWriter).Encode({{lowerCamelCase}})
+}
+
+func get{{upperCamelCasePlural}}(responseWriter http.ResponseWriter, request *http.Request) {
+    responseWriter.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(responseWriter).Encode({{lowerCamelCasePlural}})
+}
+
+func get{{upperCamelCase}}(responseWriter http.ResponseWriter, request *http.Request) {
+    responseWriter.Header().Set("Content-Type", "application/json")
+    params := mux.Vars(request)
+    input{{upperCamelCaseId}} := params["{{lowerCamelCase}}Id"]
+    for _, {{lowerCamelCase}} := range {{lowerCamelCasePlural}} {
+        if {{lowerCamelCase}}.{{upperCamelCaseId}} == input{{upperCamelCaseId}} {
+            json.NewEncoder(responseWriter).Encode({{lowerCamelCase}})
+            return
+        }
+    }
+}
+
+func update{{upperCamelCase}}(responseWriter http.ResponseWriter, request *http.Request) {
+    responseWriter.Header().Set("Content-Type", "application/json")
+    params := mux.Vars(request)
+    input{{upperCamelCaseId}} := params["{{lowerCamelCaseId}}"]
+    for i, {{lowerCamelCase}} := range {{lowerCamelCasePlural}} {
+        if {{lowerCamelCase}}.{{upperCamelCaseId}} == input{{upperCamelCaseId}} {
+            {{lowerCamelCasePlural}} = append({{lowerCamelCasePlural}}[:i], {{lowerCamelCasePlural}}[i+1:]...)
+            var updated{{upperCamelCase}} {{upperCamelCase}}
+            json.NewDecoder(request.Body).Decode(&updated{{upperCamelCase}})
+            {{lowerCamelCasePlural}} = append({{lowerCamelCasePlural}}, updated{{upperCamelCase}})
+            json.NewEncoder(responseWriter).Encode(updated{{upperCamelCase}})
+            return
+        }
+    }
+}
+
+func delete{{upperCamelCase}}(responseWriter http.ResponseWriter, request *http.Request) {
+    responseWriter.Header().Set("Content-Type", "application/json")
+    params := mux.Vars(request)
+    input{{upperCamelCaseId}} := params["{{lowerCamelCaseId}}"]
+    for i, {{lowerCamelCase}} := range {{lowerCamelCasePlural}} {
+        if {{lowerCamelCase}}.{{upperCamelCaseId}} == input{{upperCamelCaseId}} {
+            {{lowerCamelCasePlural}} = append({{lowerCamelCasePlural}}[:i], {{lowerCamelCasePlural}}[i+1:]...)
+            responseWriter.WriteHeader(http.StatusNoContent)
+            return
+        }
+    }
+}
+
+func AddRoutes(pathBase string, router *mux.Router) {
+	router.HandleFunc(pathBase + "/{{lowerCamelCasePlural}}", create{{upperCamelCase}}).Methods("POST")
+	router.HandleFunc(pathBase + "/{{lowerCamelCasePlural}}/{{lowerCamelCaseIdSlug}}" , get{{upperCamelCase}}).Methods("GET")
+	router.HandleFunc(pathBase + "/{{lowerCamelCasePlural}}", get{{upperCamelCasePlural}}).Methods("GET")
+	router.HandleFunc(pathBase + "/{{lowerCamelCasePlural}}/{{lowerCamelCaseIdSlug}}", update{{upperCamelCase}}).Methods("PUT")
+	router.HandleFunc(pathBase + "/{{lowerCamelCasePlural}}/{{lowerCamelCaseIdSlug}}", delete{{resource.name | upper_camel_case}}).Methods("DELETE")
+}
