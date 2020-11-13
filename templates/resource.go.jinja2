@@ -1,12 +1,12 @@
+package {{ package }}
+
 import (
     "encoding/json"
-    "log"
+    "github.com/gorilla/mux"
     "net/http"
     "strconv"
     "time"
-    "github.com/gorilla/mux"
 )
-
 
 {% set lowerCamelCase       = resource.name                | lower_camel_case -%}
 {% set lowerCamelCaseIdSlug = "{" + lowerCamelCase + "Id}"                    -%}
@@ -20,31 +20,44 @@ import (
 type {{ upperCamelCase }} struct {
   {{ upperCamelCaseId }} int64
   {% for m in resource.members -%}
-  {{ m.name | upper_camel_case }} {{ m.type }} `json:{{ m.name | lower_camel_case }}`
+  {{ m.name | upper_camel_case }} {{ m.type }} `json:"{{ m.name | lower_camel_case }}"`
   {% endfor %}
 }
 
-var {{upperCamelCasePlural}} []{{lowerCamelCase}}
+var {{upperCamelCasePlural}} []{{upperCamelCase}}
+
+func parseRequestForId(request *http.Request) (int64, error) {
+	params := mux.Vars(request)
+	{{lowerCamelCaseId}} := params["{{lowerCamelCaseId}}"]
+  return strconv.ParseInt({{lowerCamelCaseId}}, 10, 64)
+}
+
+func configureDefaultResponseHeaders(responseWriter *http.ResponseWriter) {
+    (*responseWriter).Header().Set("Content-Type", "application/json")
+}
 
 func create{{upperCamelCase}}(responseWriter http.ResponseWriter, request *http.Request) {
     var {{lowerCamelCase}} {{upperCamelCase}}
     json.NewDecoder(request.Body).Decode(&{{lowerCamelCase}})
-    {{lowerCamelCase}}.{{upperCamelCaseId}} = len({{upperCamelCasePlural}})
+    {{lowerCamelCase}}.{{upperCamelCaseId}} = int64(len({{upperCamelCasePlural}}))
     {{upperCamelCasePlural}} = append({{upperCamelCasePlural}}, {{lowerCamelCase}})
-    responseWriter.Header().Set("Content-Type", "application/json")
+    configureDefaultResponseHeaders(&responseWriter)
     json.NewEncoder(responseWriter).Encode({{lowerCamelCase}})
 }
 
 func get{{upperCamelCasePlural}}(responseWriter http.ResponseWriter, request *http.Request) {
     responseWriter.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(responseWriter).Encode({{lowerCamelCasePlural}})
+    json.NewEncoder(responseWriter).Encode({{upperCamelCasePlural}})
 }
 
 func get{{upperCamelCase}}(responseWriter http.ResponseWriter, request *http.Request) {
-    responseWriter.Header().Set("Content-Type", "application/json")
-    params := mux.Vars(request)
-    input{{upperCamelCaseId}} := params["{{lowerCamelCase}}Id"]
-    for _, {{lowerCamelCase}} := range {{lowerCamelCasePlural}} {
+    configureDefaultResponseHeaders(&responseWriter)
+    input{{upperCamelCaseId}}, err := parseRequestForId(request)
+    if err != nil {
+        http.Error(responseWriter, err.Error(), http.StatusBadRequest)
+        return
+    }
+    for _, {{lowerCamelCase}} := range {{upperCamelCasePlural}} {
         if {{lowerCamelCase}}.{{upperCamelCaseId}} == input{{upperCamelCaseId}} {
             json.NewEncoder(responseWriter).Encode({{lowerCamelCase}})
             return
@@ -53,15 +66,18 @@ func get{{upperCamelCase}}(responseWriter http.ResponseWriter, request *http.Req
 }
 
 func update{{upperCamelCase}}(responseWriter http.ResponseWriter, request *http.Request) {
-    responseWriter.Header().Set("Content-Type", "application/json")
-    params := mux.Vars(request)
-    input{{upperCamelCaseId}} := params["{{lowerCamelCaseId}}"]
-    for i, {{lowerCamelCase}} := range {{lowerCamelCasePlural}} {
+    configureDefaultResponseHeaders(&responseWriter)
+    input{{upperCamelCaseId}}, err := parseRequestForId(request)
+    if err != nil {
+        http.Error(responseWriter, err.Error(), http.StatusBadRequest)
+        return
+    }
+    for i, {{lowerCamelCase}} := range {{upperCamelCasePlural}} {
         if {{lowerCamelCase}}.{{upperCamelCaseId}} == input{{upperCamelCaseId}} {
-            {{lowerCamelCasePlural}} = append({{lowerCamelCasePlural}}[:i], {{lowerCamelCasePlural}}[i+1:]...)
+            {{upperCamelCasePlural}} = append({{upperCamelCasePlural}}[:i], {{upperCamelCasePlural}}[i+1:]...)
             var updated{{upperCamelCase}} {{upperCamelCase}}
             json.NewDecoder(request.Body).Decode(&updated{{upperCamelCase}})
-            {{lowerCamelCasePlural}} = append({{lowerCamelCasePlural}}, updated{{upperCamelCase}})
+            {{upperCamelCasePlural}} = append({{upperCamelCasePlural}}, updated{{upperCamelCase}})
             json.NewEncoder(responseWriter).Encode(updated{{upperCamelCase}})
             return
         }
@@ -69,12 +85,15 @@ func update{{upperCamelCase}}(responseWriter http.ResponseWriter, request *http.
 }
 
 func delete{{upperCamelCase}}(responseWriter http.ResponseWriter, request *http.Request) {
-    responseWriter.Header().Set("Content-Type", "application/json")
-    params := mux.Vars(request)
-    input{{upperCamelCaseId}} := params["{{lowerCamelCaseId}}"]
-    for i, {{lowerCamelCase}} := range {{lowerCamelCasePlural}} {
+    configureDefaultResponseHeaders(&responseWriter)
+    input{{upperCamelCaseId}}, err := parseRequestForId(request)
+    if err != nil {
+        http.Error(responseWriter, err.Error(), http.StatusBadRequest)
+        return
+    }
+    for i, {{lowerCamelCase}} := range {{upperCamelCasePlural}} {
         if {{lowerCamelCase}}.{{upperCamelCaseId}} == input{{upperCamelCaseId}} {
-            {{lowerCamelCasePlural}} = append({{lowerCamelCasePlural}}[:i], {{lowerCamelCasePlural}}[i+1:]...)
+            {{upperCamelCasePlural}} = append({{upperCamelCasePlural}}[:i], {{upperCamelCasePlural}}[i+1:]...)
             responseWriter.WriteHeader(http.StatusNoContent)
             return
         }

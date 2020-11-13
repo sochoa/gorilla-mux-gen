@@ -17,6 +17,7 @@ class Member:
 
 def cli():
     parser = argparse.ArgumentParser()
+    parser.add_argument("package")
     parser.add_argument("name")
     parser.add_argument("member", nargs="*")
     args = parser.parse_args()
@@ -30,5 +31,5 @@ def cli():
         r.members.append(Member(n, t))
 
     tmpl = env.get_template('templates/resource.go.jinja2')
-    print(tmpl.render(resource=r))
+    print(tmpl.render(resource=r, package=args.package))
 
